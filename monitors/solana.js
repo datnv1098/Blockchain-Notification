@@ -62,11 +62,12 @@ async function fetchTransactionBySignature(signature) {
 /**
  * Kiểm tra token mint này lần đầu tiên được chuyển đến ví có trong vòng 2 tháng không.
  * Helius không có date filter nên ta phân trang ngược về quá khứ, tối đa 5 trang (500 tx).
- * Nếu tìm thấy tx nào của mint này trước 2 tháng → trả về false.
- * @returns {boolean} true nếu lần đầu nhận trong 2 tháng gần nhất
+ * Nếu tìm thấy tx nào của mint này trước khoảng thời gian được cấu hình → trả về false.
+ * @returns {boolean} true nếu lần đầu nhận trong khoảng thời gian được cấu hình
  */
 async function isFirstReceiptWithin2Months(walletAddress, mint) {
-  const twoMonthsAgo = Date.now() - 60 * 24 * 60 * 60 * 1000;
+  const windowDays = Number(process.env.TOKEN_FIRST_RECEIPT_DAYS) || 60;
+  const thresholdTime = Date.now() - windowDays * 24 * 60 * 60 * 1000;
   let cursor = null;
   const MAX_PAGES = 5;
 
@@ -88,15 +89,15 @@ async function isFirstReceiptWithin2Months(walletAddress, mint) {
             t.toUserAccount?.toLowerCase() === walletAddress.toLowerCase()
         );
 
-        if (involvesMint && txTime < twoMonthsAgo) {
-          // Tìm thấy transfer cũ hơn 2 tháng → token đã ở trong ví quá lâu
+        if (involvesMint && txTime < thresholdTime) {
+          // Tìm thấy transfer cũ hơn ngưỡng → token đã ở trong ví quá lâu
           return false;
         }
       }
 
-      // Nếu toàn bộ trang này đã cũ hơn 2 tháng, không cần phân trang thêm
+      // Nếu toàn bộ trang này đã cũ hơn ngưỡng, không cần phân trang thêm
       const oldestInPage = (data[data.length - 1]?.timestamp || 0) * 1000;
-      if (oldestInPage < twoMonthsAgo) break;
+      if (oldestInPage < thresholdTime) break;
 
       cursor = data[data.length - 1]?.signature || null;
       if (!cursor) break;

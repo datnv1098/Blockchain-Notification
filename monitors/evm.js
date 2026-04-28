@@ -62,12 +62,14 @@ async function fetchIncomingTransfers(walletAddress, chain, fromDate) {
 }
 
 /**
- * Kiểm tra xem token này lần đầu tiên được chuyển đến ví có trong vòng 2 tháng không.
- * Nếu tìm thấy bất kỳ transfer nào của token này tới ví trước đây quá 2 tháng → trả về false.
- * @returns {boolean} true nếu lần đầu nhận nằm trong 2 tháng gần nhất
+ * Kiểm tra xem token này lần đầu tiên được chuyển đến ví có trong khoảng thời gian được cấu hình không.
+ * Nếu tìm thấy transfer nào của token này tới ví trước đây quá khoảng thời gian → trả về false.
+ * @returns {boolean} true nếu lần đầu nhận nằm trong khoảng thời gian được cấu hình
  */
 async function isFirstReceiptWithin2Months(walletAddress, tokenAddress, chain) {
-  const twoMonthsAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const windowDays = Number(process.env.TOKEN_FIRST_RECEIPT_DAYS) || 60;
+  const windowMs = windowDays * 24 * 60 * 60 * 1000;
+  const thresholdDate = new Date(Date.now() - windowMs);
   const chainHex = networks[chain]?.chainHex;
   if (!chainHex) return true;
   try {
@@ -75,7 +77,7 @@ async function isFirstReceiptWithin2Months(walletAddress, tokenAddress, chain) {
       Moralis.EvmApi.token.getWalletTokenTransfers({
         address: walletAddress,
         chain: chainHex,
-        toDate: twoMonthsAgo.toISOString(),
+        toDate: thresholdDate.toISOString(),
         limit: 10,
       })
     );

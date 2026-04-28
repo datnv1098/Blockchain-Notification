@@ -1,0 +1,19 @@
+{
+  "name": "blockchain-notification",
+  "version": "1.0.0",
+  "description": "Monitor wallet addresses across multiple chains and send Telegram alerts for large token inflows",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.3",
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "moralis": "^2.26.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

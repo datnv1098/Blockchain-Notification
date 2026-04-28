@@ -181,22 +181,30 @@ async function processEVMWallet(wallet) {
       const net = networks[chain] || {};
       const explorerUrl = `${net.explorerTx || ""}${tx.transaction_hash}`;
 
-      await sendAlert({
-        chain: net.name || chain,
-        chainEmoji: net.emoji || "🔗",
-        walletLabel: label,
-        walletAddress: address,
-        tokenSymbol,
-        tokenAddress,
-        amount: totalBalance,
-        usdValue: totalUsdValue,
-        txHash: tx.transaction_hash,
-        txTime: tx.block_timestamp,
-        explorerUrl,
-      });
+      try {
+        await sendAlert({
+          chain: net.name || chain,
+          chainEmoji: net.emoji || "🔗",
+          walletLabel: label,
+          walletAddress: address,
+          tokenSymbol,
+          tokenAddress,
+          amount: totalBalance,
+          usdValue: totalUsdValue,
+          txHash: tx.transaction_hash,
+          txTime: tx.block_timestamp,
+          explorerUrl,
+        });
 
-      markNotified(chain, address, tokenAddress);
-      console.log(`[EVM] ✅ Alert gửi: ${tokenSymbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
+        // Chỉ đánh dấu đã notify sau khi gửi Telegram THÀNH CÔNG
+        markNotified(chain, address, tokenAddress);
+        console.log(`[EVM] ✅ Alert gửi THÀNH CÔNG: ${tokenSymbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
+        recordSuccess(label, chain);
+      } catch (err) {
+        console.error(`[EVM] ❌ LỖI GỬI ALERT cho ${tokenSymbol}:`, err.message);
+        recordError(label, chain, `Telegram alert failed: ${err.message}`);
+        // Không đánh dấu notified nếu gửi thất bại → sẽ retry lần sau
+      }
     }
   }
 

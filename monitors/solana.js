@@ -17,6 +17,7 @@ const { Connection, PublicKey } = require("@solana/web3.js");
 const { getTokenPriceUSD } = require("../services/price");
 const { hasNotified, markNotified } = require("../services/storage");
 const { sendAlert } = require("../services/telegram");
+const { recordError, recordSuccess } = require("../services/health");
 
 const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
 const SOLSCAN_TX = "https://solscan.io/tx/";
@@ -24,7 +25,9 @@ const SOLSCAN_TX = "https://solscan.io/tx/";
 // Map address -> { connection, subscriptionId }
 const activeSubscriptions = {};
 // Set signature đã xử lý qua WebSocket (tránh poll xử lý lại)
+// Limit 500 để tránh memory leak khi bot chạy lâu
 const processedSignatures = new Set();
+const MAX_PROCESSED_SIGNATURES = 500;
 
 // ── Helius REST helpers ────────────────────────────────────────────────────
 
@@ -189,21 +192,29 @@ async function evaluateTransaction(tx, wallet) {
     console.log(`[SOL] ${tokenSymbol}: tổng ${totalBalance} = $${totalUsdValue.toFixed(2)}`);
 
     if (totalUsdValue >= threshold) {
-      await sendAlert({
-        chain: "Solana",
-        walletLabel: label,
-        walletAddress: address,
-        tokenSymbol,
-        tokenAddress: mint,
-        amount: totalBalance,
-        usdValue: totalUsdValue,
-        txHash: tx.signature,
-        txTime: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : new Date().toISOString(),
-        explorerUrl: `${SOLSCAN_TX}${tx.signature}`,
-      });
+      try {
+        await sendAlert({
+          chain: "Solana",
+          chainEmoji: "◎",
+          walletLabel: label,
+          walletAddress: address,
+          tokenSymbol,
+          tokenAddress: mint,
+          amount: totalBalance,
+          usdValue: totalUsdValue,
+          txHash: tx.signature,
+          txTime: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : new Date().toISOString(),
+          explorerUrl: `${SOLSCAN_TX}${tx.signature}`,
+        });
 
-      markNotified("solana", address, mint);
-      console.log(`[SOL] ✅ Alert gửi: ${tokenSymbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
+        markNotified("solana", address, mint);
+        console.log(`[SOL] ✅ Alert gửi THÀNH CÔNG: ${tokenSymbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
+        recordSuccess(label, "solana");
+      } catch (err) {
+        console.error(`[SOL] ❌ LỖI GỬI ALERT cho ${tokenSymbol}:`, err.message);
+        recordError(label, "solana", `Telegram alert failed: ${err.message}`);
+        // Không đánh dấu notified nếu gửi thất bại → sẽ retry lần sau
+      }
     }
   }
 }
@@ -248,8 +259,10 @@ async function startSolanaWebSocketMonitor(wallet, reconnectAttempt = 0) {
         // Tránh xử lý lại signature đã qua WS
         if (processedSignatures.has(signature)) return;
         processedSignatures.add(signature);
-        if (processedSignatures.size > 1000) {
-          processedSignatures.delete(processedSignatures.values().next().value);
+        if (processedSignatures.size > MAX_PROCESSED_SIGNATURES) {
+          const firstSig = processedSignatures.values().next().value;
+          processedSignatures.delete(firstSig);
+          console.log(`[SOL-WS] Memory: cleaned old signature (size now ${processedSignatures.size})`);
         }
 
         console.log(`[SOL-WS] Giao dịch mới: ${signature.slice(0, 12)}... -> ${label}`);
@@ -325,7 +338,12 @@ async function processSolanaWallet(wallet) {
     // Bỏ qua nếu đã được WebSocket xử lý
     if (processedSignatures.has(tx.signature)) continue;
     processedSignatures.add(tx.signature);
-    await evaluateTransaction(tx, wallet);
+    try {
+      await evaluateTransaction(tx, wallet);
+    } catch (err) {
+      console.error(`[SOL] Lỗi evaluateTransaction cho ${tx.signature}:`, err.message);
+      recordError(label, "solana", `evaluate tx error: ${err.message}`);
+    }
   }
 
   if (newLastSig) lastPollSignature[address] = newLastSig;

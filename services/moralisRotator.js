@@ -32,6 +32,7 @@ function loadKeys() {
 const KEYS = loadKeys();
 let currentIndex = 0;
 let moralisInitialized = false;
+const invalidKeys = new Set(); // keys bị hỏi vĩnh viễn trong session (401 invalid key)
 
 if (KEYS.length === 0) {
   console.warn("[MORALIS] Không tìm thấy MORALIS_API_KEY nào trong .env");
@@ -70,10 +71,23 @@ async function initMoralis() {
  * Chuyển sang key tiếp theo trong danh sách.
  * @returns {boolean} true nếu còn key khác để thử, false nếu đã hết
  */
-async function rotateKey(reason = "") {
-  const nextIndex = (currentIndex + 1) % KEYS.length;
+async function rotateKey(reason = "", permanent = false) {
+  if (permanent) {
+    invalidKeys.add(currentIndex);
+    console.warn(`[MORALIS] Key #${currentIndex + 1} bị đánh dấu INVALID vĩnh viễn.`);
+  }
 
-  if (nextIndex === currentIndex || KEYS.length <= 1) {
+  // Tìm key tiếp theo không nằm trong blacklist
+  let nextIndex = null;
+  for (let i = 1; i < KEYS.length; i++) {
+    const candidate = (currentIndex + i) % KEYS.length;
+    if (!invalidKeys.has(candidate)) {
+      nextIndex = candidate;
+      break;
+    }
+  }
+
+  if (nextIndex === null) {
     console.error("[MORALIS] Đã thử hết tất cả keys, không còn key nào khả dụng.");
     return false;
   }
@@ -120,7 +134,9 @@ async function moralisCall(fn, maxAttempts = null) {
 
       if ((isRateLimit || isAuthError) && attempt < attempts) {
         const reason = isRateLimit ? "rate limit (429)" : "auth error (401/403)";
-        const rotated = await rotateKey(reason);
+        // 401/403 không phải quota → key không hợp lệ → blacklist vĩnh viễn
+        const permanent = isAuthError && !isQuotaExceeded;
+        const rotated = await rotateKey(reason, permanent);
         if (!rotated) throw err;
         // Exponential backoff: 1s, 2s, 4s...
         console.log(`[MORALIS] Retrying in ${backoffMs}ms (attempt ${attempt}/${attempts})`);

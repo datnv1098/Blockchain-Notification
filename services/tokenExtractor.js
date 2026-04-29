@@ -43,6 +43,7 @@ function extractTokenFromTransfer(transfer) {
  * @returns {object} {name, symbol, decimals, totalSupply}
  */
 async function getTokenMetadata(tokenAddress, chain) {
+  if (!tokenAddress || typeof tokenAddress !== "string") return null;
   const cacheKey = `metadata:${chain}:${tokenAddress.toLowerCase()}`;
   
   // Check cache first

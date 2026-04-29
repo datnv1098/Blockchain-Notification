@@ -159,6 +159,12 @@ async function processEVMWallet(wallet) {
     const tokenAddress = tx.token_address;
     const tokenSymbol = tx.token_symbol || "UNKNOWN";
 
+    // Bỏ qua nếu không có địa chỉ token hợp lệ
+    if (!tokenAddress || typeof tokenAddress !== "string") {
+      console.log(`[EVM] Skip: tx không có token_address hợp lệ (${tx.transaction_hash?.slice(0, 10)}...)`);
+      continue;
+    }
+
     // FAST: Trích xuất thông tin token từ transaction (không cần API)
     const quickTokenInfo = {
       symbol: tokenSymbol,

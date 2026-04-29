@@ -11,8 +11,10 @@ const Moralis = require("moralis").default;
 const { moralisCall } = require("../services/moralisRotator");
 const { networks } = require("../config");
 const { getTokenPriceUSD } = require("../services/price");
+const { analyzeTokenFromTransfer, summarizeTransfers } = require("../services/tokenExtractor");
 const { hasNotified, markNotified } = require("../services/storage");
 const { sendAlert } = require("../services/telegram");
+const { recordSuccess, recordError } = require("../services/health");
 
 // Lưu timestamp lần check cuối (per wallet)
 const lastCheckedAt = {};
@@ -55,7 +57,12 @@ async function fetchIncomingTransfers(walletAddress, chain, fromDate) {
       cursor = result.cursor ?? null;
     } while (cursor);
   } catch (err) {
-    console.error(`[EVM] Lỗi fetch transfers cho ${walletAddress} (${chain}):`, err.message);
+    const isQuotaError = err?.response?.status === 401 && String(err.message).includes("plan");
+    if (isQuotaError) {
+      console.error(`[EVM] ⚠️  API QUOTA EXHAUSTED cho ${walletAddress} (${chain}). Polling sẽ tạm dừng.`);
+    } else {
+      console.error(`[EVM] Lỗi fetch transfers cho ${walletAddress} (${chain}):`, err.message);
+    }
   }
 
   return transfers;
@@ -125,6 +132,9 @@ async function getWalletTokenBalance(walletAddress, tokenAddress, chain) {
 /**
  * Xử lý một wallet EVM — kiểm tra transfers mới,
  * nếu có token mới thì lấy TỔNG SỐ DƯ và so với ngưỡng.
+ * 
+ * TỐI ƯU: Trích xuất token info từ transactions ngay (nhanh),
+ * không đợi metadata, cache giá trong 1 tiếng.
  */
 async function processEVMWallet(wallet) {
   const { label, address, chain } = wallet;
@@ -140,42 +150,53 @@ async function processEVMWallet(wallet) {
   console.log(`[EVM] Đang check ${label} (${chain}) từ ${fromDate.toISOString()}`);
 
   const transfers = await fetchIncomingTransfers(address, chain, fromDate);
+  
+  if (transfers.length > 0) {
+    console.log(`[EVM] 🔍 Phát hiện ${transfers.length} transfers, trích xuất token info...`);
+  }
 
   for (const tx of transfers) {
     const tokenAddress = tx.token_address;
     const tokenSymbol = tx.token_symbol || "UNKNOWN";
 
+    // FAST: Trích xuất thông tin token từ transaction (không cần API)
+    const quickTokenInfo = {
+      symbol: tokenSymbol,
+      address: tokenAddress,
+      decimals: Number(tx.token_decimals || 18),
+    };
+
     // Kiểm tra đã thông báo token này cho ví này chưa
     if (hasNotified(chain, address, tokenAddress)) {
-      console.log(`[EVM] Skip (đã notify): ${tokenSymbol} -> ${label}`);
+      console.log(`[EVM] ⏭️  Skip (đã notify): ${quickTokenInfo.symbol}`);
       continue;
     }
 
     // Điều kiện: lần đầu nhận token này phải trong vòng 2 tháng gần nhất
     const withinWindow = await isFirstReceiptWithin2Months(address, tokenAddress, chain);
     if (!withinWindow) {
-      console.log(`[EVM] Skip (token cũ > 2 tháng): ${tokenSymbol} -> ${label}`);
+      console.log(`[EVM] ⏭️  Skip (token cũ > 2 tháng): ${quickTokenInfo.symbol}`);
       continue;
     }
 
     // Lấy TỔNG SỐ DƯ token đó trên ví
     const totalBalance = await getWalletTokenBalance(address, tokenAddress, chain);
     if (totalBalance <= 0) {
-      console.log(`[EVM] Balance = 0 cho ${tokenSymbol}, bỏ qua.`);
+      console.log(`[EVM] ⏭️  Balance = 0, skip: ${quickTokenInfo.symbol}`);
       continue;
     }
 
-    // Lấy giá USD
+    // CACHED: Lấy giá USD (cache 1 tiếng)
     const pricePerToken = await getTokenPriceUSD(tokenAddress, chain);
     if (pricePerToken == null) {
-      console.log(`[EVM] Không lấy được giá cho ${tokenSymbol} (${tokenAddress})`);
+      console.log(`[EVM] ⚠️  Không lấy giá: ${quickTokenInfo.symbol} (${tokenAddress})`);
       continue;
     }
 
     const totalUsdValue = totalBalance * pricePerToken;
     const threshold = Number(process.env.ALERT_THRESHOLD_USD || 50000);
 
-    console.log(`[EVM] ${tokenSymbol}: tổng ${totalBalance.toFixed(4)} tokens = $${totalUsdValue.toFixed(2)} (ngưỡng: $${threshold})`);
+    console.log(`[EVM] 💰 ${quickTokenInfo.symbol}: tổng ${totalBalance.toFixed(4)} tokens = $${totalUsdValue.toFixed(2)} USD (ngưỡng: $${threshold})`);
 
     if (totalUsdValue >= threshold) {
       const net = networks[chain] || {};
@@ -187,7 +208,7 @@ async function processEVMWallet(wallet) {
           chainEmoji: net.emoji || "🔗",
           walletLabel: label,
           walletAddress: address,
-          tokenSymbol,
+          tokenSymbol: quickTokenInfo.symbol,
           tokenAddress,
           amount: totalBalance,
           usdValue: totalUsdValue,
@@ -198,10 +219,10 @@ async function processEVMWallet(wallet) {
 
         // Chỉ đánh dấu đã notify sau khi gửi Telegram THÀNH CÔNG
         markNotified(chain, address, tokenAddress);
-        console.log(`[EVM] ✅ Alert gửi THÀNH CÔNG: ${tokenSymbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
+        console.log(`[EVM] ✅ Alert gửi THÀNH CÔNG: ${quickTokenInfo.symbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
         recordSuccess(label, chain);
       } catch (err) {
-        console.error(`[EVM] ❌ LỖI GỬI ALERT cho ${tokenSymbol}:`, err.message);
+        console.error(`[EVM] ❌ LỖI GỬI ALERT cho ${quickTokenInfo.symbol}:`, err.message);
         recordError(label, chain, `Telegram alert failed: ${err.message}`);
         // Không đánh dấu notified nếu gửi thất bại → sẽ retry lần sau
       }

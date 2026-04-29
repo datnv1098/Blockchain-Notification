@@ -11,6 +11,7 @@ require("dotenv").config();
 const axios = require("axios");
 const Moralis = require("moralis").default;
 const { moralisCall } = require("./moralisRotator");
+const { get: cacheGet, set: cacheSet } = require("./cache");
 
 // Mapping chain name -> Moralis chain hex
 const CHAIN_HEX = {
@@ -101,12 +102,23 @@ async function getCoinGeckoPrice(tokenAddress, chain) {
 
 /**
  * Lấy giá USD của token — thử theo thứ tự ưu tiên, fallback nếu thất bại
+ * Kết quả được cache trong 1 tiếng để tránh lặp lại API calls.
+ * Ưu tiên tốc độ: cache hit nhanh, fallback sang CoinGecko nếu Moralis fail.
  *
  * @param {string} tokenAddress
  * @param {string} chain - "ethereum" | "bsc" | "solana"
  * @returns {number|null}
  */
 async function getTokenPriceUSD(tokenAddress, chain) {
+  // Cache key: "price:chain:tokenAddress"
+  const cacheKey = `price:${chain}:${tokenAddress.toLowerCase()}`;
+  
+  // Kiểm tra cache trước
+  const cached = cacheGet(cacheKey);
+  if (cached !== null) {
+    return cached;
+  }
+
   let price = null;
 
   if (chain === "solana") {
@@ -120,6 +132,11 @@ async function getTokenPriceUSD(tokenAddress, chain) {
     if (price == null) {
       price = await getCoinGeckoPrice(tokenAddress, chain);
     }
+  }
+
+  // Cache result (1 tiếng TTL - giảm API calls tối đa)
+  if (price != null) {
+    cacheSet(cacheKey, price, 60 * 60 * 1000);
   }
 
   return price;

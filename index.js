@@ -20,7 +20,11 @@ const {
   recordCycleStart,
 } = require("./services/health");
 
-const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS) || 30_000; // mặc định 30 giây
+const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS) || 5 * 60 * 1000; // mặc định 5 phút (giảm từ 30 giây để tránh vượt quota)
+
+// Track khi quota exhausted để tạm dừng polling
+let quotaExhaustedAt = null;
+const QUOTA_PAUSE_MS = Number(process.env.QUOTA_PAUSE_MINUTES || 60) * 60 * 1000;
 
 // ──────────────────────────────────────────────
 // Khởi tạo Moralis SDK (chỉ gọi 1 lần)
@@ -35,6 +39,19 @@ async function initMoralisSDK() {
 // Chạy một vòng poll cho tất cả ví
 // ──────────────────────────────────────────────
 async function runPollCycle() {
+  // Kiểm tra nếu quota đã exceeded, tạm dừng polling
+  if (quotaExhaustedAt) {
+    const elapsedMs = Date.now() - quotaExhaustedAt;
+    if (elapsedMs < QUOTA_PAUSE_MS) {
+      const remainingMin = Math.ceil((QUOTA_PAUSE_MS - elapsedMs) / 60000);
+      console.log(`[PAUSE] Quota exceeded, tạm dừng ${remainingMin} phút còn lại...`);
+      return;
+    } else {
+      console.log("[RESUME] Quota pause hết, tiếp tục polling...");
+      quotaExhaustedAt = null;
+    }
+  }
+
   if (!wallets || wallets.length === 0) {
     console.log("[INFO] Không có ví nào được cấu hình trong config.js.");
     return;
@@ -49,7 +66,14 @@ async function runPollCycle() {
   const evmWallets = wallets.filter((w) => evmChains.includes(w.chain));
   const evmPromise = evmWallets.length
     ? processEVMWallets(wallets).catch((err) => {
-        console.error("[ERROR] EVM parallel poll lỗi:", err.message);
+        const isQuotaError = err?.response?.status === 401 && String(err.message).includes("plan");
+        if (isQuotaError) {
+          console.error("[QUOTA] API quota exhausted! Pausing polling...");
+          quotaExhaustedAt = Date.now();
+          sendError("⚠️  MORALIS QUOTA EXHAUSTED! Polling tạm dừng 1 giờ.").catch(() => {});
+        } else {
+          console.error("[ERROR] EVM parallel poll lỗi:", err.message);
+        }
       })
     : Promise.resolve();
 

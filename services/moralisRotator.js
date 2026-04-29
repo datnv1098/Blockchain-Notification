@@ -100,6 +100,7 @@ async function moralisCall(fn, maxAttempts = null) {
   }
 
   const attempts = maxAttempts ?? KEYS.length;
+  let backoffMs = 1000; // Start with 1 second backoff
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
@@ -108,13 +109,23 @@ async function moralisCall(fn, maxAttempts = null) {
       const status = err?.response?.status || err?.status || err?.code;
       const isRateLimit = status === 429 || String(err.message).includes("rate limit");
       const isAuthError = status === 401 || status === 403;
+      const isQuotaExceeded = status === 401 && String(err.message).includes("plan");
+
+      if (isQuotaExceeded) {
+        // Plan quota exceeded - don't retry, pause for a while
+        const pauseMinutes = Number(process.env.QUOTA_PAUSE_MINUTES) || 60;
+        console.error(`[MORALIS] Quota exceeded! Pausing for ${pauseMinutes} minutes. Error:`, err.message);
+        throw err; // Let caller handle the pause
+      }
 
       if ((isRateLimit || isAuthError) && attempt < attempts) {
         const reason = isRateLimit ? "rate limit (429)" : "auth error (401/403)";
         const rotated = await rotateKey(reason);
         if (!rotated) throw err;
-        // Delay nhỏ trước khi retry
-        await new Promise((r) => setTimeout(r, 500));
+        // Exponential backoff: 1s, 2s, 4s...
+        console.log(`[MORALIS] Retrying in ${backoffMs}ms (attempt ${attempt}/${attempts})`);
+        await new Promise((r) => setTimeout(r, backoffMs));
+        backoffMs = Math.min(backoffMs * 2, 10000); // Cap at 10 seconds
         continue;
       }
 

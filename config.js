@@ -37,121 +37,182 @@ module.exports = {
   wallets: [
 
     // ── ETHEREUM ─────────────────────────────────────────────────────────────
+
     // === EXCHANGES ===
+
     {
-      label:   "Binance Hot Wallet 1",
-      address: "0xf977814e90da44bfa03339d0edf48f3c4d2f3f6f",
+      label:   "Binance Hot Wallet (0x889)",
+      address: "0x8894E0a0c962CB723c1976a4421c95949bE2D4E3",
       chain:   "ethereum",
       tags:    ["exchange", "binance"],
     },
+
     {
-      label:   "Binance Hot Wallet 2",
-      address: "0x8894e0a0c962cb60db3f35ef5a539c50d3c51423",
-      chain:   "ethereum",
-      tags:    ["exchange", "binance"],
-    },
-    {
-      label:   "Coinbase Custody",
-      address: "0x71c7656ec7ab88b098defb751b7401b5f6d8976f",
+      label:   "Coinbase Hot Wallet (0x503)",
+      address: "0x503828976D22510aad0201ac7EC88293211D23Da",
       chain:   "ethereum",
       tags:    ["exchange", "coinbase"],
     },
+
     {
-      label:   "OKX Hot Wallet",
-      address: "0x6db43d8009d91e38b2d8d359239e146811292d21c",
+      label:   "OKX Hot Wallet (0x504)",
+      address: "0x5041ed759Dd4aFc3a72b8192C143F72f4724081A",
       chain:   "ethereum",
       tags:    ["exchange", "okx"],
     },
+
     {
-      label:   "Bybit Hot",
-      address: "0x3b91e7a18a33e8ad98a8dadc1bce4fdcbe0c7ef8",
+      label:   "Bybit Hot Wallet (0xf89)",
+      address: "0xf89d7b9c864f589bbF53a82105107622B35EaA40",
       chain:   "ethereum",
       tags:    ["exchange", "bybit"],
     },
 
+
     // === VENTURE CAPITAL / FUNDS ===
+
     {
-      label:   "a16z Crypto",
-      address: "0x4aBfDC6f4eb47e92ba1b5B3F3fC21E88f44e80Ec",
+      label:   "a16z Crypto (0x05E)",
+      address: "0x05E793cE0C6027323Ac150F6d45C2344d28B6019",
       chain:   "ethereum",
       tags:    ["fund", "vc", "a16z"],
     },
+
     {
-      label:   "Paradigm Fund",
-      address: "0x5f0c328e66c28d5b3f90797ba1ef74ae84849b92",
+      label:   "Paradigm Capital (0x115)",
+      address: "0x11577a8A5bAF1e25B9a2d89f39670F447d75c3cD",
       chain:   "ethereum",
       tags:    ["fund", "paradigm"],
     },
+
     {
-      label:   "Pantera Capital",
-      address: "0xe674eb2acaaaa6d42c5c4bd14d4aca381a4f8d8d",
+      label:   "Pantera Capital (0xe52)",
+      address: "0xe523Fc253BcdEA8373E030ee66e00c6864776d70",
       chain:   "ethereum",
       tags:    ["fund", "pantera"],
     },
+
     {
-      label:   "Multicoin Capital",
-      address: "0x0eb5B86991c2a1243c2873735e28e9cf0CbEEbD3",
+      label:   "Multicoin Capital (0x475)",
+      address: "0x475ea9EA47F13A1D1f144f0A36501f822A0f7648",
       chain:   "ethereum",
       tags:    ["fund", "multicoin"],
     },
+
     {
-      label:   "Three Arrows Capital",
-      address: "0x6be0ae71e6522dac1b36831487216d4350177d86",
+      label:   "Three Arrows Capital (0x486)",
+      address: "0x4862733B5FdDFd35f35ea8CCf08F5045e57388B3",
       chain:   "ethereum",
       tags:    ["fund", "3ac"],
     },
 
+
     // === TRADING & MARKET MAKERS ===
+
     {
-      label:   "Jump Trading",
-      address: "0x1c0aa8ccd568d90d61659f060d1bfb5cd51bcc29",
+      label:   "Jump Crypto (0xf58)",
+      address: "0xf584F8728B874a6a5c7A8d4d387C9aae9172D621",
       chain:   "ethereum",
       tags:    ["trading", "jump"],
     },
+
     {
-      label:   "Wintermute",
-      address: "0x2f0b23f53734252e6b82563ad7b406f51d1a9b4d",
+      label:   "Wintermute (0x768)",
+      address: "0x76801132a22801640284Cd67F7DD41fED2926B6a",
       chain:   "ethereum",
       tags:    ["market-maker", "wintermute"],
     },
+
     {
-      label:   "Alameda Research",
-      address: "0x3bae4d3e2bbf58d5c4bfc8d9573db06368f39486",
+      label:   "Wintermute: Market Maker (0x51C)",
+      address: "0x51C72848c68a965f66FA7a88855F9f7784502a7F",
+      chain:   "ethereum",
+      tags:    ["market-maker", "wintermute"],
+    },
+
+    {
+      label:   "Alameda Research (0x84D)",
+      address: "0x84D34f4f83a87596Cd3FB6887cFf8F17Bf5A7B83",
       chain:   "ethereum",
       tags:    ["trading", "alameda"],
     },
+
     {
-      label:   "DWF Labs",
-      address: "0xb5d00b5e326fbe0a5fc386c9e8c1a06cf4f9a9f5",
+      label:   "DWF Labs (0x53c)",
+      address: "0x53c902A9EF069F3b85e5e71f918C4D582F3063Fa",
       chain:   "ethereum",
       tags:    ["fund", "dwf"],
     },
+
     {
-      label:   "GSR Markets",
-      address: "0x79194d213167c7434e91fd08be3a27be1b9c8e00",
+      label:   "GSR Markets (0xe92)",
+      address: "0xe92e65049b3c2ca12806E9567B08895118c5a03f",
       chain:   "ethereum",
       tags:    ["market-maker", "gsr"],
     },
+
     {
-      label:   "Cumberland DRW",
-      address: "0x2c66999125a94b5b2dcb2d1a2b8e3f5f3e2d1c0b",
+      label:   "Cumberland DRW (0xad6)",
+      address: "0xad6eaa735D9dF3D7696fd03984379dAE02eD8862",
       chain:   "ethereum",
       tags:    ["market-maker", "cumberland"],
     },
 
+
+    // === INDIVIDUAL / KEY OPINION LEADERS ===
+
+    {
+      label:   "Vitalik Buterin (vitalik.eth)",
+      address: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+      chain:   "ethereum",
+      tags:    ["individual", "vitalik", "ethereum-founder"],
+    },
+
+    {
+      label:   "Vitalik Buterin (0xAb5)",
+      address: "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
+      chain:   "ethereum",
+      tags:    ["individual", "vitalik"],
+    },
+
+    {
+      label:   "Vitalik Buterin (0x1Db)",
+      address: "0x1Db3439a222C519ab44bb1144fC28167b4Fa6EE6",
+      chain:   "ethereum",
+      tags:    ["individual", "vitalik"],
+    },
+
+    {
+      label:   "Vitalik Buterin (0x9D2)",
+      address: "0x9D22816f6611cFcB0cDE5076C5f4e4A269E79Bef",
+      chain:   "ethereum",
+      tags:    ["individual", "vitalik"],
+    },
+
+    {
+      label:   "Changpeng Zhao (CZ Binance)",
+      address: "0x28816c4C4792467390C90e5B426F198570E29307",
+      chain:   "ethereum",
+      tags:    ["individual", "cz", "binance-founder"],
+    },
+
+
     // ── BSC (BNB CHAIN) ───────────────────────────────────────────────────────
+
     {
       label:   "Binance BSC",
       address: "0x47ac0Fb4F2D84898b4Ef3592596cf3d64663c997",
       chain:   "bsc",
       tags:    ["exchange", "binance"],
     },
+
     {
       label:   "OKX BSC",
       address: "0x0a7e2b0d8c5e3f1b9a7d2e4f6c8b1a9e7d5c3b1a",
       chain:   "bsc",
       tags:    ["exchange", "okx"],
     },
+
     {
       label:   "Bybit BSC",
       address: "0x1c0aa8ccd568d90d61659f060d1bfb5cd51bcc29",
@@ -159,25 +220,30 @@ module.exports = {
       tags:    ["exchange", "bybit"],
     },
 
+
     // ── SOLANA ────────────────────────────────────────────────────────────────
+
     {
       label:   "Binance Solana",
       address: "GUrdSGsISXor7ZqkzauecKHMGnpSXjnKguPakc1FCiks",
       chain:   "solana",
       tags:    ["exchange", "binance"],
     },
+
     {
       label:   "Coinbase Solana",
       address: "ydXkhwcrtMpxkecc5K92co2gWXoKUytKwAP5W2awrC",
       chain:   "solana",
       tags:    ["exchange", "coinbase"],
     },
+
     {
       label:   "OKX Solana",
       address: "BVNo8ftg2eh64rCmm4saRd7avwrKaiJ85zv16NK7qWc",
       chain:   "solana",
       tags:    ["exchange", "okx"],
     },
+
     {
       label:   "Jump Trading Solana",
       address: "JUP6LkbZbjS1jKKwapdHNXUQRY1Xw5By6g1muKAVNKt",

@@ -58,6 +58,8 @@ async function main() {
     { num: 1, value: process.env.MORALIS_API_KEY_1 },
     { num: 2, value: process.env.MORALIS_API_KEY_2 },
     { num: 3, value: process.env.MORALIS_API_KEY_3 },
+    { num: 4, value: process.env.MORALIS_API_KEY_4 },
+    { num: 5, value: process.env.MORALIS_API_KEY_5 },
   ];
 
   const results = [];

@@ -50,31 +50,39 @@ function log(level, tag, msg) {
  * Kiểm tra Moralis API còn hoạt động không (lấy block number ETH)
  */
 async function checkMoralis() {
-  const key = process.env.MORALIS_API_KEY_1 || process.env.MORALIS_API_KEY_2 ||
-    process.env.MORALIS_API_KEY_3 || process.env.MORALIS_API_KEY;
-  if (!key) {
+  // Thu thập tất cả keys có trong .env
+  const allKeys = [
+    process.env.MORALIS_API_KEY_1,
+    process.env.MORALIS_API_KEY_2,
+    process.env.MORALIS_API_KEY_3,
+    process.env.MORALIS_API_KEY,
+  ].filter((k, i, arr) => k && arr.indexOf(k) === i); // bỏ rỗng + dedup
+
+  if (allKeys.length === 0) {
     stats.apiStatus.moralis = "skip";
     return { ok: true, msg: "Không cấu hình (skip)" };
   }
-  const { getKeyStatus } = require("./moralisRotator");
-  const keyStatus = getKeyStatus();
-  try {
-    const { data } = await axios.get(
-      "https://deep-index.moralis.io/api/v2.2/dateToBlock?chain=eth&date=2024-01-01",
-      {
-        headers: { "X-API-Key": key },
-        timeout: 8000,
+
+  // Thử từng key cho đến khi có key nào hoạt động
+  for (let i = 0; i < allKeys.length; i++) {
+    const key = allKeys[i];
+    try {
+      const { data } = await axios.get(
+        "https://deep-index.moralis.io/api/v2.2/dateToBlock?chain=eth&date=2024-01-01",
+        { headers: { "X-API-Key": key }, timeout: 8000 }
+      );
+      if (data?.block) {
+        stats.apiStatus.moralis = "ok";
+        return { ok: true, msg: `Key #${i + 1}/${allKeys.length} hoạt động` };
       }
-    );
-    if (data?.block) {
-      stats.apiStatus.moralis = "ok";
-      return { ok: true, msg: `Key #${keyStatus.currentIndex}/${keyStatus.total} hoạt động` };
+    } catch (err) {
+      const is401 = err.response?.status === 401;
+      console.warn(`[HEALTH] Moralis Key #${i + 1} ${is401 ? "không hợp lệ" : "lỗi: " + err.message} — thử key tiếp theo...`);
     }
-    throw new Error("Phản hồi không hợp lệ");
-  } catch (err) {
-    stats.apiStatus.moralis = "error";
-    return { ok: false, msg: err.response?.status === 401 ? `Key #${keyStatus.currentIndex} không hợp lệ` : err.message };
   }
+
+  stats.apiStatus.moralis = "error";
+  return { ok: false, msg: `Tất cả ${allKeys.length} key đều không hoạt động` };
 }
 
 /**

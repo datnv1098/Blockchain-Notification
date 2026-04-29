@@ -19,6 +19,8 @@ function loadKeys() {
     process.env.MORALIS_API_KEY_1,
     process.env.MORALIS_API_KEY_2,
     process.env.MORALIS_API_KEY_3,
+    process.env.MORALIS_API_KEY_4,
+    process.env.MORALIS_API_KEY_5,
   ].filter(Boolean); // bỏ key rỗng
 
   // Backward compat: nếu dùng MORALIS_API_KEY cũ thì thêm vào đầu
@@ -55,14 +57,70 @@ async function initWithCurrentKey() {
 }
 
 /**
- * Khởi tạo Moralis lần đầu — gọi 1 lần từ index.js
+ * Khởi tạo Moralis lần đầu — thử từng key cho đến khi có key hợp lệ.
+ * Key không hợp lệ (401) sẽ bị blacklist ngay.
  */
 async function initMoralis() {
   if (KEYS.length === 0) {
     console.warn("[MORALIS] Bỏ qua khởi tạo — không có key.");
     return;
   }
-  await initWithCurrentKey();
+
+  // Thử key hiện tại, nếu fail thì tìm key kế tiếp còn hợp lệ
+  for (let i = 0; i < KEYS.length; i++) {
+    if (invalidKeys.has(currentIndex)) {
+      // Tìm key tiếp theo chưa bị blacklist
+      let found = false;
+      for (let j = 1; j < KEYS.length; j++) {
+        const candidate = (currentIndex + j) % KEYS.length;
+        if (!invalidKeys.has(candidate)) {
+          currentIndex = candidate;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        console.error("[MORALIS] Tất cả keys đều không hợp lệ.");
+        return;
+      }
+    }
+
+    await initWithCurrentKey();
+
+    // Kiểm tra xem key có thực sự hoạt động không
+    try {
+      const axios = require("axios");
+      await axios.get(
+        "https://deep-index.moralis.io/api/v2.2/dateToBlock?chain=eth&date=2024-01-01",
+        { headers: { "X-API-Key": KEYS[currentIndex] }, timeout: 8000 }
+      );
+      console.log(`[MORALIS] Key #${currentIndex + 1} xác nhận hợp lệ.`);
+      return; // key tốt, xong
+    } catch (err) {
+      if (err.response?.status === 401) {
+        console.warn(`[MORALIS] Key #${currentIndex + 1} không hợp lệ (401) — blacklist và thử key tiếp.`);
+        invalidKeys.add(currentIndex);
+        // Tìm key tiếp
+        let found = false;
+        for (let j = 1; j < KEYS.length; j++) {
+          const candidate = (currentIndex + j) % KEYS.length;
+          if (!invalidKeys.has(candidate)) {
+            currentIndex = candidate;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          console.error("[MORALIS] Tất cả keys đều không hợp lệ.");
+          return;
+        }
+      } else {
+        // Lỗi mạng, không blacklist
+        console.warn(`[MORALIS] Key #${currentIndex + 1} lỗi kết nối (${err.message}) — vẫn dùng key này.`);
+        return;
+      }
+    }
+  }
 }
 
 // ── Rotate sang key tiếp theo ─────────────────────────────────────────────

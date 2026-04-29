@@ -223,19 +223,21 @@ module.exports = {
 
     // ── SOLANA ────────────────────────────────────────────────────────────────
 
-    {
-      label:   "Binance Solana",
-      address: "GUrdSGsISXor7ZqkzauecKHMGnpSXjnKguPakc1FCiks",
-      chain:   "solana",
-      tags:    ["exchange", "binance"],
-    },
+    // TODO: thay bằng địa chỉ Solana hợp lệ của Binance (chứa ký tự ngoài base58)
+    // {
+    //   label:   "Binance Solana",
+    //   address: "GUrdSGsISXor7ZqkzauecKHMGnpSXjnKguPakc1FCiks",
+    //   chain:   "solana",
+    //   tags:    ["exchange", "binance"],
+    // },
 
-    {
-      label:   "Coinbase Solana",
-      address: "ydXkhwcrtMpxkecc5K92co2gWXoKUytKwAP5W2awrC",
-      chain:   "solana",
-      tags:    ["exchange", "coinbase"],
-    },
+    // TODO: thay bằng địa chỉ Solana hợp lệ của Coinbase
+    // {
+    //   label:   "Coinbase Solana",
+    //   address: "ydXkhwcrtMpxkecc5K92co2gWXoKUytKwAP5W2awrC",
+    //   chain:   "solana",
+    //   tags:    ["exchange", "coinbase"],
+    // },
 
     {
       label:   "OKX Solana",

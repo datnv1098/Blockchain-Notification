@@ -35,6 +35,14 @@ const MAX_PROCESSED_SIGNATURES = 500;
  * Lấy danh sách giao dịch gần nhất (dùng cho poll fallback)
  */
 async function fetchSolanaTransactions(walletAddress, beforeSig = null) {
+  // Validate địa chỉ Solana trước khi gọi API để tránh lỗi 400
+  try {
+    new PublicKey(walletAddress);
+  } catch {
+    console.warn(`[SOL] ⚠️  Địa chỉ Solana không hợp lệ, bỏ qua: ${walletAddress}`);
+    return [];
+  }
+
   try {
     const params = { "api-key": HELIUS_API_KEY, type: "TOKEN_TRANSFER", limit: 50 };
     if (beforeSig) params.before = beforeSig;
@@ -364,18 +372,20 @@ const lastSignature = {};
  * @returns {Array} mảng parsed transactions từ Helius
  */
 async function fetchSolanaTransactions(walletAddress) {
+  // Validate địa chỉ Solana trước khi gọi API để tránh lỗi 400
+  try {
+    new PublicKey(walletAddress);
+  } catch {
+    console.warn(`[SOL] ⚠️  Địa chỉ Solana không hợp lệ, bỏ qua: ${walletAddress}`);
+    return [];
+  }
+
   try {
     const params = {
       "api-key": HELIUS_API_KEY,
       type: "TOKEN_TRANSFER",
       limit: 50,
     };
-
-    // Nếu đã có checkpoint, chỉ lấy txs sau checkpoint đó
-    if (lastSignature[walletAddress]) {
-      params.before = undefined; // Helius pagination bằng "before" signature
-      // Lấy tất cả gần nhất rồi filter theo signature
-    }
 
     const url = `https://api.helius.xyz/v0/addresses/${walletAddress}/transactions`;
     const { data } = await axios.get(url, { params, timeout: 15000 });

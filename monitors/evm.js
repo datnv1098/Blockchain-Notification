@@ -137,10 +137,12 @@ async function getWalletTokenBalance(walletAddress, tokenAddress, chain) {
  * không đợi metadata, cache giá trong 1 tiếng.
  */
 async function processEVMWallet(wallet) {
-  const { label, address, chain } = wallet;
+  const { label, chain } = wallet;
+  // Normalize về lowercase để tránh Moralis C0005 (invalid checksum address)
+  const address = typeof wallet.address === "string" ? wallet.address.toLowerCase() : null;
 
   // Guard: bỏ qua ví không có address hợp lệ
-  if (!address || typeof address !== "string") {
+  if (!address) {
     console.warn(`[EVM] ⚠️  Ví "${label}" không có address hợp lệ, bỏ qua.`);
     return;
   }

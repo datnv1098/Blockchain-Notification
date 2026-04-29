@@ -49,7 +49,6 @@ async function fetchIncomingTransfers(walletAddress, chain, fromDate) {
       if (!result?.result) break;
 
       for (const tx of result.result) {
-        // Moralis v2 mới: field token contract là "address", wallet nhận là "to_address"
         if (tx.to_address?.toLowerCase() === walletAddress.toLowerCase()) {
           transfers.push(tx);
         }
@@ -92,6 +91,7 @@ async function isFirstReceiptWithin2Months(walletAddress, tokenAddress, chain) {
     const result = response?.raw;
     const oldTransfers = (result?.result || []).filter(
       (tx) =>
+        // Moralis v2: field đổi từ "token_address" → "address"
         (tx.address || tx.token_address)?.toLowerCase() === tokenAddress.toLowerCase() &&
         tx.to_address?.toLowerCase() === walletAddress.toLowerCase()
     );

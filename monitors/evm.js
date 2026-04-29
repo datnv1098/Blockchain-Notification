@@ -91,7 +91,7 @@ async function isFirstReceiptWithin2Months(walletAddress, tokenAddress, chain) {
     const result = response?.raw;
     const oldTransfers = (result?.result || []).filter(
       (tx) =>
-        // Moralis v2: field đổi từ "token_address" → "address"
+        // Moralis v2 đổi field từ "token_address" → "address"
         (tx.address || tx.token_address)?.toLowerCase() === tokenAddress.toLowerCase() &&
         tx.to_address?.toLowerCase() === walletAddress.toLowerCase()
     );
@@ -166,7 +166,7 @@ async function processEVMWallet(wallet) {
   }
 
   for (const tx of transfers) {
-    // Moralis v2: token contract address field đổi từ "token_address" → "address"
+    // Moralis v2 đổi field từ "token_address" → "address"
     const tokenAddress = tx.address || tx.token_address;
     const tokenSymbol = tx.token_symbol || "UNKNOWN";
     const txHash = tx.transaction_hash?.slice(0, 12) || "unknown";

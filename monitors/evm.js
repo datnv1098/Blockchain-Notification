@@ -138,6 +138,13 @@ async function getWalletTokenBalance(walletAddress, tokenAddress, chain) {
  */
 async function processEVMWallet(wallet) {
   const { label, address, chain } = wallet;
+
+  // Guard: bỏ qua ví không có address hợp lệ
+  if (!address || typeof address !== "string") {
+    console.warn(`[EVM] ⚠️  Ví "${label}" không có address hợp lệ, bỏ qua.`);
+    return;
+  }
+
   const walletKey = `${chain}:${address}`;
 
   if (!lastCheckedAt[walletKey]) {
@@ -158,80 +165,85 @@ async function processEVMWallet(wallet) {
   for (const tx of transfers) {
     const tokenAddress = tx.token_address;
     const tokenSymbol = tx.token_symbol || "UNKNOWN";
+    const txHash = tx.transaction_hash?.slice(0, 12) || "unknown";
 
-    // Bỏ qua nếu không có địa chỉ token hợp lệ
+    // ── Bước 1: Validate token address ──────────────────────────────────────
     if (!tokenAddress || typeof tokenAddress !== "string") {
-      console.log(`[EVM] Skip: tx không có token_address hợp lệ (${tx.transaction_hash?.slice(0, 10)}...)`);
+      console.log(`[EVM] [${txHash}] Skip: không có token_address hợp lệ`);
       continue;
     }
 
-    // FAST: Trích xuất thông tin token từ transaction (không cần API)
-    const quickTokenInfo = {
-      symbol: tokenSymbol,
-      address: tokenAddress,
-      decimals: Number(tx.token_decimals || 18),
-    };
-
-    // Kiểm tra đã thông báo token này cho ví này chưa
+    // ── Bước 2: Deduplication — đã notify chưa? ─────────────────────────────
     if (hasNotified(chain, address, tokenAddress)) {
-      console.log(`[EVM] ⏭️  Skip (đã notify): ${quickTokenInfo.symbol}`);
+      console.log(`[EVM] [${txHash}] Skip (đã notify): ${tokenSymbol} → ${label}`);
       continue;
     }
 
-    // Điều kiện: lần đầu nhận token này phải trong vòng 2 tháng gần nhất
+    // ── Bước 3: Time window — token có được nhận trong vòng N ngày không? ───
+    console.log(`[EVM] [${txHash}] Kiểm tra time window cho ${tokenSymbol} (${tokenAddress.slice(0, 8)}...)...`);
     const withinWindow = await isFirstReceiptWithin2Months(address, tokenAddress, chain);
     if (!withinWindow) {
-      console.log(`[EVM] ⏭️  Skip (token cũ > 2 tháng): ${quickTokenInfo.symbol}`);
+      const windowDays = Number(process.env.TOKEN_FIRST_RECEIPT_DAYS) || 60;
+      console.log(`[EVM] [${txHash}] Skip (token nhận lần đầu > ${windowDays} ngày trước): ${tokenSymbol}`);
       continue;
     }
+    console.log(`[EVM] [${txHash}] ✅ Time window OK: ${tokenSymbol}`);
 
-    // Lấy TỔNG SỐ DƯ token đó trên ví
+    // ── Bước 4: Lấy TỔNG SỐ DƯ token trên ví (không phải số lượng tx) ──────
+    console.log(`[EVM] [${txHash}] Lấy tổng balance ${tokenSymbol} của ${label}...`);
     const totalBalance = await getWalletTokenBalance(address, tokenAddress, chain);
     if (totalBalance <= 0) {
-      console.log(`[EVM] ⏭️  Balance = 0, skip: ${quickTokenInfo.symbol}`);
+      console.log(`[EVM] [${txHash}] Skip (balance = 0): ${tokenSymbol}`);
       continue;
     }
+    console.log(`[EVM] [${txHash}] ✅ Balance: ${totalBalance.toLocaleString()} ${tokenSymbol}`);
 
-    // CACHED: Lấy giá USD (cache 1 tiếng)
+    // ── Bước 5: Lấy giá USD hiện tại ────────────────────────────────────────
+    console.log(`[EVM] [${txHash}] Lấy giá USD cho ${tokenSymbol}...`);
     const pricePerToken = await getTokenPriceUSD(tokenAddress, chain);
-    if (pricePerToken == null) {
-      console.log(`[EVM] ⚠️  Không lấy giá: ${quickTokenInfo.symbol} (${tokenAddress})`);
+    if (pricePerToken == null || pricePerToken <= 0) {
+      console.log(`[EVM] [${txHash}] Skip (không lấy được giá): ${tokenSymbol}`);
       continue;
     }
+    console.log(`[EVM] [${txHash}] ✅ Giá: $${pricePerToken.toFixed(6)}/token`);
 
+    // ── Bước 6: So sánh với ngưỡng ──────────────────────────────────────────
     const totalUsdValue = totalBalance * pricePerToken;
     const threshold = Number(process.env.ALERT_THRESHOLD_USD || 50000);
+    console.log(`[EVM] [${txHash}] 💰 ${tokenSymbol}: ${totalBalance.toLocaleString()} × $${pricePerToken.toFixed(6)} = $${totalUsdValue.toFixed(2)} (ngưỡng: $${threshold.toLocaleString()})`);
 
-    console.log(`[EVM] 💰 ${quickTokenInfo.symbol}: tổng ${totalBalance.toFixed(4)} tokens = $${totalUsdValue.toFixed(2)} USD (ngưỡng: $${threshold})`);
+    if (totalUsdValue < threshold) {
+      console.log(`[EVM] [${txHash}] Skip (dưới ngưỡng $${threshold.toLocaleString()}): $${totalUsdValue.toFixed(2)}`);
+      continue;
+    }
 
-    if (totalUsdValue >= threshold) {
-      const net = networks[chain] || {};
-      const explorerUrl = `${net.explorerTx || ""}${tx.transaction_hash}`;
+    // ── Bước 7: Gửi Telegram Alert ──────────────────────────────────────────
+    const net = networks[chain] || {};
+    const explorerUrl = `${net.explorerTx || ""}${tx.transaction_hash}`;
 
-      try {
-        await sendAlert({
-          chain: net.name || chain,
-          chainEmoji: net.emoji || "🔗",
-          walletLabel: label,
-          walletAddress: address,
-          tokenSymbol: quickTokenInfo.symbol,
-          tokenAddress,
-          amount: totalBalance,
-          usdValue: totalUsdValue,
-          txHash: tx.transaction_hash,
-          txTime: tx.block_timestamp,
-          explorerUrl,
-        });
+    try {
+      await sendAlert({
+        chain: net.name || chain,
+        chainEmoji: net.emoji || "🔗",
+        walletLabel: label,
+        walletAddress: address,
+        tokenSymbol,
+        tokenAddress,
+        amount: totalBalance,
+        usdValue: totalUsdValue,
+        txHash: tx.transaction_hash,
+        txTime: tx.block_timestamp,
+        explorerUrl,
+      });
 
-        // Chỉ đánh dấu đã notify sau khi gửi Telegram THÀNH CÔNG
-        markNotified(chain, address, tokenAddress);
-        console.log(`[EVM] ✅ Alert gửi THÀNH CÔNG: ${quickTokenInfo.symbol} tổng $${totalUsdValue.toFixed(2)} -> ${label}`);
-        recordSuccess(label, chain);
-      } catch (err) {
-        console.error(`[EVM] ❌ LỖI GỬI ALERT cho ${quickTokenInfo.symbol}:`, err.message);
-        recordError(label, chain, `Telegram alert failed: ${err.message}`);
-        // Không đánh dấu notified nếu gửi thất bại → sẽ retry lần sau
-      }
+      // Bước 8: Đánh dấu đã notify — chỉ sau khi Telegram gửi THÀNH CÔNG
+      markNotified(chain, address, tokenAddress);
+      console.log(`[EVM] ✅ Alert gửi THÀNH CÔNG: ${tokenSymbol} $${totalUsdValue.toFixed(2)} → ${label}`);
+      recordSuccess(label, chain);
+    } catch (err) {
+      console.error(`[EVM] ❌ LỖI GỬI ALERT cho ${tokenSymbol}:`, err.message);
+      recordError(label, chain, `Telegram alert failed: ${err.message}`);
+      // Không đánh dấu notified → retry lần sau
     }
   }
 
